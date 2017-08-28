@@ -1,32 +1,22 @@
 /*
-  Blink
-  Turns on an LED on for one second, then off for one second, repeatedly.
+  Box1
 
-  Most Arduinos have an on-board LED you can control. On the Uno and
-  Leonardo, it is attached to digital pin 13. If you're unsure what
-  pin the on-board LED is connected to on your Arduino model, check
-  the documentation at http://www.arduino.cc
-
-  This example code is in the public domain.  
-
-  modified 8 May 2014
-  by Scott Fitzgerald
-
-
+  modified  August 2017
+  by Jacoby Daniel
   
- */
+*/
 
 // Board NodeMCU 0.9 (ESP-12 Module) 
-// We need to include Wire.h for I2C communication
-#include <Wire.h>
+
+#include <Wire.h>             // We need to include Wire.h for I2C communication
 #include "OLED.h"
 #include <ESP8266WiFi.h> 
 #include <Adafruit_NeoPixel.h>
-#include <PubSubClient.h>  // http://knolleary.net/arduino-client-for-mqtt/ 
-
+#include <PubSubClient.h>     // http://knolleary.net/arduino-client-for-mqtt/ 
+                              // https://pubsubclient.knolleary.net/api.html
 // Mqtt Stuff
 
-// ************************************************************************ Cloud *********************************************
+// ****************************** Cloud *********************************************
 #define  CLOUD_MQTT  0         //https://www.cloudmqtt.com/ (Amazon Web Services)
 #define  CLOUD_DIOTY 1        // http://www.dioty.co/    (colombian guy)
 #define  CLOUD_DANY  2        // At home Local network    (At home)
@@ -42,7 +32,7 @@ IPAddress MqttServer(192,168,0,101);
 const unsigned int MqttPort=1883; 
 const char MqttUser[]="itba.jacoby@gmail.com";
 const char MqttPassword[]="ce8acbf5";
-const char MqttClientID[]="danyka";
+const char MqttClientID[]="mainbox";
 
 #elif CLOUD==CLOUD_DIOTY
 
@@ -64,7 +54,7 @@ const char MqttClientID[]="danyka";
 
 // Create Cloud sockets
 WiFiClient wclient;
-PubSubClient client(wclient);
+PubSubClient mqtt_client(wclient);
 ///PubSubClient (server, port , [callback], client, [stream])
 
 //=====================================================================
@@ -163,28 +153,16 @@ void setup() {
 void loop() {
 
 
-  if (!client.connected()) {
+  if (!mqtt_client.connected()) {
       reconnect();
       
  }
 
-  client.loop();  //This should be called regularly to allow the client to process incoming messages and maintain its connection to the server
+  mqtt_client.loop();  //This should be called regularly to allow the client to process incoming messages and maintain its connection to the server
 
    //level_detect_A();
    edge_detect_A();
    edge_detect_B();
-   delay(100);
-  
-/*  digitalWrite(D5, RELAY_ON);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);                  // wait for a second
-  digitalWrite(D5, RELAY_OFF);  // turn the LED off by making the voltage LOW
-  delay(1000);                  // wait for a second
-
-  digitalWrite(D6, RELAY_ON);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);              // wait for a second
-  digitalWrite(D6, RELAY_OFF);    // turn the LED off by making the voltage LOW
-  delay(1000);              // wait for a second
-*/
   
 }
 
@@ -202,9 +180,9 @@ button_state edge_detect_A(void)
           if((present_value^previous_value)&present_value) //rising edge
           {
 
-              print_display(" 1 ");
-              digitalWrite(RELAY_A, RELAY_ON);
-              client.publish("box1/switch_A","1",false);
+             // print_display(" 1 ");
+             // digitalWrite(RELAY_A, RELAY_ON);
+              mqtt_client.publish("box1/switch_A","1",false);
               
             
           }
@@ -212,9 +190,9 @@ button_state edge_detect_A(void)
           if((present_value^previous_value)&!present_value) //falling edge
           {
 
-              print_display(" 0 ");
-              digitalWrite(RELAY_A, RELAY_OFF);
-              client.publish("box1/switch_A","0",false);
+             // print_display(" 0 ");
+             // digitalWrite(RELAY_A, RELAY_OFF);
+              mqtt_client.publish("box1/switch_A","0",false);
               
             
           }
@@ -239,9 +217,9 @@ button_state edge_detect_B(void)
           if((present_value^previous_value)&present_value) //rising edge
           {
 
-              print_display(" 1 ");
-              digitalWrite(RELAY_B, RELAY_ON);
-              client.publish("box1/switch_B","1",false);
+             // print_display(" 1 ");
+             // digitalWrite(RELAY_B, RELAY_ON);
+              mqtt_client.publish("box1/switch_B","1",false);
 
               
             
@@ -250,9 +228,9 @@ button_state edge_detect_B(void)
           if((present_value^previous_value)&!present_value) //falling edge
           {
 
-              print_display(" 0 ");
-              digitalWrite(RELAY_B, RELAY_OFF);
-              client.publish("box1/switch_B","0",false);
+             // print_display(" 0 ");
+             // digitalWrite(RELAY_B, RELAY_OFF);
+              mqtt_client.publish("box1/switch_B","0",false);
               
             
           }
@@ -263,31 +241,7 @@ button_state edge_detect_B(void)
   
 }
 
-button_state level_detect_A(void)
-{
 
-        if(digitalRead(BUTTON_B))
-        {
-         
-          print_display(" 1 ");
-          digitalWrite(RELAY_B, RELAY_ON);
-    
-
-          
-        }
-        else
-        {
-          
-              print_display(" 0 ");
-              digitalWrite(RELAY_B, RELAY_OFF);
-            
-
-        }
-
-
-            
-        
-}        
 
 
 
@@ -335,8 +289,8 @@ void setup_mqtt(void) {
   
 //http://pubsubclient.knolleary.net/api.html   (Arduino mqtt API)
 
- client.setServer(MqttServer, MqttPort);
- client.setCallback(callback);
+ mqtt_client.setServer(MqttServer, MqttPort);
+ mqtt_client.setCallback(callback);
 }
 
 
@@ -427,33 +381,33 @@ void ParseTopic(char* topic, byte* payload, unsigned int length)
 
 void reconnect() {
 
-  while (!client.connected())      // Loop until we're reconnected
+  while (!mqtt_client.connected())      // Loop until we're reconnected
   {
       debug_message("Attempting MQTT connection...");
       // Attempt to connect
  
  
-      if (client.connect(MqttClientID,MqttUser,MqttPassword))
+      if (mqtt_client.connect(MqttClientID,MqttUser,MqttPassword))
       {
             debug_message("connected \r\n");
   
   
             // ... and subscribe to topic
-            client.subscribe("box1/rgbled");
-            client.subscribe("box1/display");
-            client.subscribe("box1/RelayA");
-            client.subscribe("box1/RelayB");
+            mqtt_client.subscribe("box1/rgbled");
+            mqtt_client.subscribe("box1/display");
+            mqtt_client.subscribe("box1/RelayA");
+            mqtt_client.subscribe("box1/RelayB");
 
 
       }
       else
       {
             debug_message("failed, rc=");       //Verrrrrr
-            debug_message("%s",client.state());
+            debug_message("%s",mqtt_client.state());
             debug_message(" try again in 3 seconds \r\n");
   
       
-            delay(3000);  //Wait 5 seconds before retrying
+            delay(3000);  //Wait 3 seconds before retrying
       }
       
   } // end of while

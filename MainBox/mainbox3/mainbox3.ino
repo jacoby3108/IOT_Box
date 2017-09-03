@@ -28,7 +28,7 @@
 #if CLOUD==CLOUD_DANY
 
 //const char MqttServer[]="mqtt.dioty.co";
-IPAddress MqttServer(192,168,0,101);
+IPAddress MqttServer(192,168,0,102);
 const unsigned int MqttPort=1883; 
 const char MqttUser[]="itba.jacoby@gmail.com";
 const char MqttPassword[]="ce8acbf5";

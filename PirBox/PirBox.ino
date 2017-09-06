@@ -32,7 +32,7 @@ IPAddress MqttServer(192,168,0,102);
 const unsigned int MqttPort=1883; 
 const char MqttUser[]="itba.jacoby@gmail.com";
 const char MqttPassword[]="ce8acbf5";
-const char MqttClientID[]="Dimmer";
+const char MqttClientID[]="PirBox";
 
 #elif CLOUD==CLOUD_DIOTY
 
@@ -66,9 +66,9 @@ PubSubClient mqtt_client(wclient);
 #define ON HIGH
 
 
-#define PWM_A  D5
-#define PWM_B  D6 
-#define STATUS_LED  D7 
+#define PIR  D5
+#define MQTT_STS  D6 
+#define STATUS_LED  D7 //Wifi - broker connection status
 
 // Status Led (blue)
 // If it blinks fast: Unable to connect to Wifi network
@@ -97,36 +97,28 @@ char password[] = "GEDA2016";   // Set password to "" for open networks.
 void setup_wifi(void);    
 void setup_mqtt(void);
 
+enum b_state {NO_EDGE,RISING_EDGE,FALLING_EDGE};
+typedef enum b_state button_state;
+button_state  b1;
 
-#define DONE 0
-#define BUSY 1
-
-#define SLOW_ON_TIME_STEP 10  //En mseg
-#define SLOW_OFF_TIME_STEP 10  //En mseg
-
-unsigned char slow_on_request=false;
-unsigned char slow_off_request=false;
- 
-signed int duty;
+button_state edge_detect_A(void);
+unsigned char mqtt_enable=false;
 
 
 // the setup function runs once when you press reset or power the board
 void setup() {
 
   Serial.begin(9600, SERIAL_8N1);  // Serial Port Parameters
-  // initialize digital pin 13 as an output.
-  pinMode(PWM_A , OUTPUT);
-  pinMode(PWM_B , OUTPUT);
-  pinMode(STATUS_LED , OUTPUT);
 
+  pinMode(PIR, INPUT);
+  pinMode(STATUS_LED , OUTPUT);
+  pinMode(MQTT_STS , OUTPUT);
+ 
   
-  analogWrite(PWM_A, 0);  //only channel a will be implemented channel B will be deployed in next releases
-  analogWrite(PWM_B, 600);
   digitalWrite(STATUS_LED,OFF);
+  digitalWrite(MQTT_STS,OFF);
   
-  
-  
-  delay(2000);           // something wierd if this delay is bigger no wifi conection is possible !!!
+  delay(1000);
   setup_wifi();          // initialize WIFI an connect to network
   setup_mqtt();          // initialize mqtt server 
 
@@ -144,106 +136,10 @@ void loop() {
  }
 
   mqtt_client.loop();  //This should be called regularly to allow the client to process incoming messages and maintain its connection to the server
-
-
-
-  if (slow_on_request==true)   // MQTT request for slow on
-  {
-      if(slow_on()== DONE)     // Do slow on until Done (slow on is non blocking)  
-        slow_on_request=false;
-  }
-
-  if (slow_off_request==true)   // MQTT request for slow off
-  {
-      if(slow_off()== DONE)     // Do slow off until Done (slow on is non blocking)  
-        slow_off_request=false;
-  }
-
-    
-    
-
-    //debug_message("duty: %d \n",ddd);
+  edge_detect_A();
+ 
 }
 
-
-
-unsigned char slow_on(void)   //Dimmer Slow on (slow on is non blocking) 
-{
-
-static unsigned int in_progress=false;
-static long Lastime;
-
-
-    if(in_progress==false)   //First time ?
-    {
-      Lastime=millis();      // Reset Non blocking timer
-      in_progress=true;      // Start Task 
-     
-    }  
-
-    
-    if (millis() - Lastime > SLOW_ON_TIME_STEP) // Non blocking Delay 
-    {  
-      
-          Lastime = millis();        //Restart timer
-          analogWrite(PWM_A, duty);  //Update light level
-          duty+=5;                   //Update duty
-     
-          if(duty>1023)              // Max intensity reached ?
-          {
-              duty=1023;             // Update right value
-              analogWrite(PWM_A, duty);
-              in_progress=false;     // Task finished
-              mqtt_client.publish("Dimmer/Slow_on_done","1",false);
-              return DONE;
-              
-    
-          }
-    
-      
-    }
-
-     return BUSY;
-}
-
-unsigned char slow_off(void)   //Dimmer Slow on (slow on is non blocking) 
-{
-
-static unsigned int in_progress=false;
-static long Lastime;
-
-
-    if(in_progress==false)   //First time ?
-    {
-      Lastime=millis();      // Reset Non blocking timer
-      in_progress=true;      // Start Task 
-     
-    }  
-
-    
-    if (millis() - Lastime > SLOW_OFF_TIME_STEP) // Non blocking Delay 
-    {  
-      
-          Lastime = millis();       //Restart timer
-          analogWrite(PWM_A, duty); //Update light level
-          duty-=5;                  //Update duty
-     
-          if(duty<0)                // Min intensity reached ?
-          {
-              duty=0;               // Update right value
-              analogWrite(PWM_A, duty);
-              in_progress=false;    // Task finished
-              mqtt_client.publish("Dimmer/Slow_off_done","1",false);
-              return DONE;
-              
-    
-          }
-    
-      
-    }
-
-     return BUSY;
-}
 
 void setup_wifi(void) {
 
@@ -297,44 +193,45 @@ void ParseTopic(char* topic, byte* payload, unsigned int length)
 
 // ============================== PARSER ==================================================
 
-  if(!strcmp(topic,"Dimmer/IntensityA"))  
+  if(!strcmp(topic,"pirbox/mqtt_enable"))  
   {
+
+      //printf("RelA:%s\n", payload);
+      if(payload[0]=='0')
+      {
+       
+         digitalWrite(MQTT_STS,OFF);
+         mqtt_enable=false;
+      }
+      
+      
+      if(payload[0]=='1')
+      {
+       
+         digitalWrite(MQTT_STS,ON);
+         mqtt_enable=true;
+      }
+      
+
+  }
+/*
+  if(!strcmp(topic,"bigbox/RelayB"))  
+  {
+       printf("RelB:%s\n", payload);
+
+      if(payload[0]=='0')
+        digitalWrite(RELAY_B, RELAY_OFF);
+      if(payload[0]=='1')
+        digitalWrite(RELAY_B, RELAY_ON);
+
+
+  }
+*/
 
         
-      String dty = String((char*)payload);
-      duty=dty.toInt();
-    //  printf("PWM_A:%d\n", duty);
-      analogWrite(PWM_A, duty);
-
-    
-  }
-
-  if(!strcmp(topic,"Dimmer/slowon"))  
-  {
-
-      if(payload[0]=='1')
-       if(slow_on_request==false && slow_off_request==false)
-       {
-           slow_on_request=true;
-           debug_message("Start slow on ");
-       }
-    
-  }
-
-
-  if(!strcmp(topic,"Dimmer/slowoff"))  
-  {
-
-      if(payload[0]=='1')
-       if(slow_off_request==false && slow_on_request==false)
-       {
-           slow_off_request=true;
-           debug_message("Start slow off ");
-       }
-    
-  }
-         
 }
+
+
 
 
 
@@ -354,11 +251,9 @@ void reconnect() {
   
             // ... and subscribe to topic
            
-            mqtt_client.subscribe("Dimmer/IntensityA");
-            mqtt_client.subscribe("Dimmer/IntensityB");
-            mqtt_client.subscribe("Dimmer/slowon");
-            mqtt_client.subscribe("Dimmer/slowoff");
-          
+            mqtt_client.subscribe("pirbox/mqtt_enable");
+
+       
             digitalWrite(STATUS_LED,ON);
 
       }
@@ -380,5 +275,42 @@ void reconnect() {
   } // end of while
  
 }
+
+
+button_state edge_detect_A(void)
+{
+
+
+   static unsigned char previous_value=0;
+   unsigned char present_value;
+
+          present_value=digitalRead(PIR);
+
+          if((present_value^previous_value)&present_value) //rising edge
+          {
+
+              if(mqtt_enable==true)
+              mqtt_client.publish("pirbox/triggered","1",false);  //PIR sensor activated 
+              
+            
+          }
+
+          if((present_value^previous_value)&!present_value) //falling edge
+          {
+
+              if(mqtt_enable==true)
+              mqtt_client.publish("pirbox/released","0",false);  //PIR sensor deactivated
+              
+            
+          }
+
+          previous_value=present_value;
+
+      
+  
+}
+
+
+
 
 

@@ -81,7 +81,7 @@ button_state level_detect_A(void);
 
 
 // WiFi credentials
-char ssid[] = "IOT_WIFI";
+char ssid[] = "NODE_RED";
 char password[] = "GEDA2016";   // Set password to "" for open networks.
 
 

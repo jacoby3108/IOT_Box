@@ -42,7 +42,7 @@
 #include <PubSubClient.h>     // http://knolleary.net/arduino-client-for-mqtt/ 
 
 // WiFi credentials
-char ssid[] = "IOT_WIFI";
+char ssid[] = "NODE_RED";
 char password[] = "GEDA2016";   // Set password to "" for open networks.
                   
                               

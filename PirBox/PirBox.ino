@@ -104,6 +104,12 @@ button_state  b1;
 button_state edge_detect_A(void);
 unsigned char mqtt_enable=false;
 
+long TimeSinceLastMeasure = 0;
+
+
+uint32_t Ldr_delayMS=1000;  
+unsigned char ldr_enable=true;
+
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -136,7 +142,21 @@ void loop() {
  }
 
   mqtt_client.loop();  //This should be called regularly to allow the client to process incoming messages and maintain its connection to the server
+  
   edge_detect_A();
+
+
+ 
+  if (millis() - TimeSinceLastMeasure > Ldr_delayMS) {   // Delay between measurements.
+         
+      debug_message("ADC %d\n",analogRead(A0));
+
+      if(ldr_enable==true)   
+      mqtt_client.publish("pirbox/ldrvalue",String(analogRead(A0)).c_str(),false);
+           
+      TimeSinceLastMeasure = millis();
+  }
+  
  
 }
 
@@ -214,6 +234,36 @@ void ParseTopic(char* topic, byte* payload, unsigned int length)
       
 
   }
+
+  if(!strcmp(topic,"pirbox/ldr_enable"))  
+  {
+
+      
+      if(payload[0]=='0')
+      {
+       
+        /// digitalWrite(MQTT_STS,OFF);
+         ldr_enable=false;
+      }
+      
+      
+      if(payload[0]=='1')
+      {
+       
+        // digitalWrite(MQTT_STS,ON);
+         ldr_enable=true;
+      }
+      
+
+  }
+
+  if(!strcmp(topic,"pirbox/Set_ldr_Delay"))  
+  {
+
+          Ldr_delayMS=atoi((char*)payload);
+          debug_message("Reading interval: %d\n",Ldr_delayMS);
+
+  }
 /*
   if(!strcmp(topic,"bigbox/RelayB"))  
   {
@@ -252,6 +302,9 @@ void reconnect() {
             // ... and subscribe to topic
            
             mqtt_client.subscribe("pirbox/mqtt_enable");
+            mqtt_client.subscribe("pirbox/ldr_enable");
+            mqtt_client.subscribe("pirbox/Set_ldr_Delay");
+            
 
        
             digitalWrite(STATUS_LED,ON);
